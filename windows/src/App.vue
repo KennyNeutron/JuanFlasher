@@ -841,9 +841,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import juanrobotixLogo from "../assets/juanrobotix_logo.png";
 import { supabase } from "./supabase";
+import { native, subscribeNativeEvents } from "./tauri";
+import { nativeErrorMessage } from "./native-error";
 
 // --- State ---
 const currentView = ref<"login" | "dashboard">("login");
@@ -867,7 +869,9 @@ const generateLoading = ref(false);
 const tempUsers = ref<any[]>([]);
 
 // Active session monitoring timer
-let expirationCheckInterval: any = null;
+let expirationCheckInterval: ReturnType<typeof setInterval> | null = null;
+let portCheckInterval: ReturnType<typeof setInterval> | null = null;
+let nativeEventUnlisteners: Array<() => void> = [];
 
 const startExpirationCheck = () => {
   if (expirationCheckInterval) clearInterval(expirationCheckInterval);
@@ -951,7 +955,7 @@ const handleSignOut = async () => {
   
   // Clear any downloaded cloud firmware on logout
   try {
-    await window.electron.ipcRenderer.invoke("clear-firmware-cache");
+    await native.clearFirmwareCache();
   } catch (e) {
     console.error("Error clearing firmware cache:", e);
   }
@@ -1133,13 +1137,13 @@ const onCloudFileSelected = async () => {
       new Uint8Array(arrayBuffer).reduce((d, byte) => d + String.fromCharCode(byte), "")
     );
 
-    const localPath = await window.electron.ipcRenderer.invoke("save-cloud-firmware", {
-      fileName: selectedCloudFile.value,
+    const localPath = await native.saveCloudFirmware(
+      selectedCloudFile.value,
       base64Data,
-    });
+    );
 
     firmwarePath.value = localPath;
-    addLog(`Cloud firmware ready: ${localPath}`);
+    addLog(`Cloud firmware ready: ${selectedCloudFile.value}`);
   } catch (e: any) {
     addLog(`[Cloud Error] ${e.message}`);
   } finally {
@@ -1149,7 +1153,7 @@ const onCloudFileSelected = async () => {
 
 const clearCloudCache = async () => {
   try {
-    await window.electron.ipcRenderer.invoke("clear-firmware-cache");
+    await native.clearFirmwareCache();
   } catch (e) {
     console.error("Error clearing firmware cache:", e);
   }
@@ -1230,7 +1234,7 @@ const isPortConnected = ref(true);
 onMounted(async () => {
   // Clear any leftover downloaded cloud firmware when the app starts
   try {
-    await window.electron.ipcRenderer.invoke("clear-firmware-cache");
+    await native.clearFirmwareCache();
   } catch (e) {
     console.error("Error clearing firmware cache on startup:", e);
   }
@@ -1273,62 +1277,36 @@ onMounted(async () => {
   }
 
   // Initial logs
-  addLog("Juan Flasher v3.2.2 initialized");
+  addLog("Juan Flasher v4.0.2 initialized");
   addLog("System ready");
   addLog("Waiting for command...");
 
   // Load ports
   await refreshPorts();
 
-  // Listen for avrdude logs with buffering support
-  window.electron.ipcRenderer.on(
-    "avrdude-log",
-    (_event: any, message: string) => {
-      // Append to buffer
-      // If message contains line breaks or is a progress update, handle accordingly
-      handleAvrdudeLog(message);
+  // Listen for AVRDUDE and serial events from the Tauri backend.
+  nativeEventUnlisteners = await subscribeNativeEvents({
+    onSerialData: (data) => {
+      const safeData = data.replace(/\r/g, "");
+      if (serialMessages.value.length === 0) serialMessages.value.push("");
+      const parts = safeData.split("\n");
+      const lastIdx = serialMessages.value.length - 1;
+      serialMessages.value[lastIdx] += parts[0];
+      for (let i = 1; i < parts.length; i++) serialMessages.value.push(parts[i]);
+      scrollToBottomSerial();
     },
-  );
-
-  // Listen for Serial Data
-  // Listen for Serial Data
-  window.electron.ipcRenderer.on("serial-data", (_e: any, data: string) => {
-    // Basic buffering: Append incoming data to the last line if no newline,
-    // or split and push if newlines are present.
-    // Also strip \r to avoid artifacts, assuming \n is primary separator
-    const safeData = data.replace(/\r/g, "");
-
-    // If we have no lines yet, add one
-    if (serialMessages.value.length === 0) {
-      serialMessages.value.push("");
-    }
-
-    const parts = safeData.split("\n");
-
-    // The first part always belongs to the *current* last line
-    const lastIdx = serialMessages.value.length - 1;
-    serialMessages.value[lastIdx] += parts[0];
-
-    // Any subsequent parts are new lines
-    for (let i = 1; i < parts.length; i++) {
-      serialMessages.value.push(parts[i]);
-    }
-
-    scrollToBottomSerial();
-  });
-
-  window.electron.ipcRenderer.on("serial-error", (_e: any, msg: string) => {
-    addLog(`[SERIAL ERROR] ${msg}`);
-    serialConnected.value = false;
-  });
-
-  window.electron.ipcRenderer.on("serial-closed", () => {
-    addLog(`[SERIAL] Port closed`);
-    serialConnected.value = false;
+    onSerialError: (msg) => {
+      addLog(`[SERIAL ERROR] ${msg}`);
+      serialConnected.value = false;
+    },
+    onSerialClosed: () => {
+      addLog(`[SERIAL] Port closed`);
+      serialConnected.value = false;
+    },
   });
 
   // Periodic port availability check (every 2 seconds)
-  setInterval(async () => {
+  portCheckInterval = setInterval(async () => {
     if (selectedPort.value !== "Select a port...") {
       await refreshPorts();
       // Check if selected port still exists in the ports list
@@ -1340,58 +1318,13 @@ onMounted(async () => {
   }, 2000);
 });
 
+onBeforeUnmount(() => {
+  if (portCheckInterval) clearInterval(portCheckInterval);
+  if (expirationCheckInterval) clearInterval(expirationCheckInterval);
+  nativeEventUnlisteners.forEach((unlisten) => unlisten());
+});
+
 // --- Actions ---
-
-/**
- * Handles incoming log chunks from avrdude.
- * Reconstructs lines and updates the UI for progress bars.
- */
-const handleAvrdudeLog = (msg: string) => {
-  if (!msg) return;
-
-  const parts = msg.split("\n");
-
-  parts.forEach((part) => {
-    // Skip empty chunks if we have multiple (avoids double spacing from split)
-    if (!part && parts.length > 1) return;
-    if (!part) return;
-
-    const trimmed = part.trim();
-    // Detect if this part acts as a "Header" or start of a new progress block
-    const isNewHeader =
-      trimmed.startsWith("Reading |") ||
-      trimmed.startsWith("Writing |") ||
-      trimmed.startsWith("Verifying |");
-
-    // Detect if this part is a progress update (has # or %) AND is NOT a new header
-    const isProgressUpdate =
-      !isNewHeader && (trimmed.includes("#") || trimmed.includes("%"));
-
-    if (isProgressUpdate) {
-      const lastLogIndex = logs.value.length - 1;
-      if (lastLogIndex >= 0) {
-        const lastLog = logs.value[lastLogIndex];
-        // Only append if the last line matches a progress bar pattern
-        // (Starts with expected headers or contains #)
-        if (
-          lastLog.includes("Reading |") ||
-          lastLog.includes("Writing |") ||
-          lastLog.includes("Verifying |") ||
-          lastLog.includes("#")
-        ) {
-          logs.value[lastLogIndex] = lastLog + part;
-          scrollToBottomTerminal();
-          return;
-        }
-      }
-    }
-
-    // Otherwise, push as a new line
-    logs.value.push(`> ${part}`);
-  });
-
-  scrollToBottomTerminal();
-};
 
 const addLog = (msg: string) => {
   if (!msg || !msg.trim()) return;
@@ -1424,7 +1357,7 @@ const scrollToBottomSerial = () => {
 
 const refreshPorts = async () => {
   try {
-    const result = await window.electron.ipcRenderer.invoke("list-ports");
+    const result = await native.listPorts();
     ports.value = result;
     // Auto-select first if available and none selected
     if (ports.value.length > 0 && selectedPort.value === "Select a port...") {
@@ -1437,8 +1370,8 @@ const refreshPorts = async () => {
 
 const browseFirmware = async () => {
   try {
-    const path = await window.electron.ipcRenderer.invoke("dialog:open-file");
-    if (path) {
+    const path = await native.openHexFile();
+    if (typeof path === "string") {
       firmwarePath.value = path;
       addLog(`Selected firmware: ${path}`);
     }
@@ -1463,7 +1396,7 @@ const uploadFirmware = async () => {
   isBusy.value = true;
   addLog(`Starting Firmware Upload to ${selectedPort.value}...`);
   try {
-    await window.electron.ipcRenderer.invoke("upload-firmware", {
+    await native.uploadFirmware({
       port: selectedPort.value,
       hexPath: firmwarePath.value,
       mcu: selectedMcu.value,
@@ -1471,7 +1404,7 @@ const uploadFirmware = async () => {
     });
     addLog("Upload Complete!");
   } catch (e: any) {
-    addLog(`Upload Failed: ${e.message}`);
+    addLog(`Upload Failed: ${nativeErrorMessage(e)}`);
   } finally {
     isBusy.value = false;
   }
@@ -1479,7 +1412,7 @@ const uploadFirmware = async () => {
 
 // 2. Stop
 const stopOperation = async () => {
-  await window.electron.ipcRenderer.invoke("stop-operation");
+  await native.stopOperation();
   addLog("Operation stopped by user.");
   isBusy.value = false;
 };
@@ -1495,7 +1428,7 @@ const ispUpload = async () => {
   isBusy.value = true;
   addLog(`Starting ISP Upload using ${selectedIsp.value}...`);
   try {
-    await window.electron.ipcRenderer.invoke("isp-upload", {
+    await native.ispUpload({
       programmer: selectedIsp.value,
       hexPath: firmwarePath.value,
       mcu: selectedMcu.value,
@@ -1503,7 +1436,7 @@ const ispUpload = async () => {
     });
     addLog("ISP Upload Complete!");
   } catch (e: any) {
-    addLog(`ISP Upload Failed: ${e.message}`);
+    addLog(`ISP Upload Failed: ${nativeErrorMessage(e)}`);
   } finally {
     isBusy.value = false;
   }
@@ -1516,14 +1449,14 @@ const burnBootloader = async () => {
   isBusy.value = true;
   addLog(`Burning Bootloader for ${selectedMcu.value}...`);
   try {
-    await window.electron.ipcRenderer.invoke("burn-bootloader", {
+    await native.burnBootloader({
       programmer: selectedIsp.value,
       mcu: selectedMcu.value,
       port: selectedPort.value,
     });
     addLog("Bootloader Burn Complete!");
   } catch (e: any) {
-    addLog(`Burn Failed: ${e.message}`);
+    addLog(`Burn Failed: ${nativeErrorMessage(e)}`);
   } finally {
     isBusy.value = false;
   }
@@ -1536,14 +1469,14 @@ const testWiring = async () => {
   isBusy.value = true;
   addLog("Testing Wiring...");
   try {
-    await window.electron.ipcRenderer.invoke("test-wiring", {
+    await native.testWiring({
       programmer: selectedIsp.value,
       mcu: selectedMcu.value,
       port: selectedPort.value,
     });
     addLog("Wiring Test Success! (Avrdude connected)");
   } catch (e: any) {
-    addLog(`Wiring Test Failed: ${e.message}`);
+    addLog(`Wiring Test Failed: ${nativeErrorMessage(e)}`);
   } finally {
     isBusy.value = false;
   }
@@ -1552,7 +1485,7 @@ const testWiring = async () => {
 // 6. Serial Monitor Connect
 const toggleSerial = async () => {
   if (serialConnected.value) {
-    await window.electron.ipcRenderer.invoke("serial-disconnect");
+    await native.serialDisconnect();
     // State updated by event
   } else {
     if (selectedPort.value === "Select a port...") {
@@ -1561,10 +1494,10 @@ const toggleSerial = async () => {
     }
     addLog(`Connecting Serial to ${selectedPort.value}...`);
     clearSerialLogs(); // Auto-clear on connect
-    const success = await window.electron.ipcRenderer.invoke("serial-connect", {
-      port: selectedPort.value,
-      baud: serialBaud.value,
-    });
+    const success = await native.serialConnect(
+      selectedPort.value,
+      Number(serialBaud.value),
+    );
     if (success) {
       serialConnected.value = true;
       addLog("Serial Connected.");
@@ -1594,7 +1527,7 @@ const sendSerial = async () => {
       break;
   }
 
-  await window.electron.ipcRenderer.invoke("serial-write", textToSend);
+  await native.serialWrite(textToSend);
   // Echo local?
   serialMessages.value.push(`[TX] ${textToSend.trim()}`);
   serialInput.value = "";
@@ -2755,6 +2688,48 @@ const sendSerial = async () => {
 .btn-delete:hover {
   background-color: rgba(244, 67, 54, 0.1);
   box-shadow: 0 0 8px rgba(244, 67, 54, 0.2);
+}
+
+/* Keep the admin workspace usable inside the default 800px window. */
+@media (max-width: 850px) {
+  .admin-panel-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .admin-body {
+    overflow: auto;
+  }
+
+  .temp-users-table-wrapper {
+    overflow: auto;
+  }
+
+  .temp-users-table {
+    min-width: 560px;
+  }
+}
+
+@media (max-height: 850px) {
+  .bottom-panel {
+    min-height: 0;
+  }
+
+  .admin-body {
+    padding: 10px;
+  }
+
+  .admin-panel-section {
+    padding: 10px;
+  }
+
+  .admin-panel-grid {
+    gap: 10px;
+  }
 }
 
 /* --- Cloud Firmware Styles --- */
