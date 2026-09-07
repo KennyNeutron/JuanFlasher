@@ -1538,19 +1538,23 @@ const sendSerial = async () => {
 <style>
 /* --- Design System --- */
 :root {
-  --bg-dark: #1a1a1a;
-  --bg-panel: #242424;
-  --bg-input: #111111;
-  --primary-color: #00bcd4; /* Cyan/Teal */
-  --primary-hover: #00acc1;
-  --warning-color: #ff9800; /* Orange */
-  --warning-hover: #f57c00;
-  --danger-color: #f44336; /* Red */
-  --danger-hover: #d32f2f;
-  --success-color: #4caf50; /* Green */
-  --text-main: #ffffff;
-  --text-muted: #aaaaaa;
-  --border-color: #333333;
+  --bg-dark: #000000;
+  --bg-panel: #090D12;
+  --bg-input: #05070A;
+  --bg-surface: #0D131A;
+  --primary-color: #00A8E8;
+  --primary-hover: #19C8FF;
+  --warning-color: #D88924;
+  --warning-hover: #E6A34A;
+  --danger-color: #E25555;
+  --danger-hover: #F06B6B;
+  --success-color: #00A8E8;
+  --text-main: #F2F5F7;
+  --text-muted: #8A949C;
+  --text-secondary: #8A949C;
+  --text-disabled: #4D565E;
+  --border-color: #141C23;
+  --border-strong: #243541;
 }
 
 /* --- Layout --- */
@@ -1558,7 +1562,7 @@ const sendSerial = async () => {
   position: relative;
   width: 100vw;
   height: 100vh;
-  background-color: #0c0c0e;
+  background-color: var(--bg-dark);
   overflow: hidden;
 }
 
@@ -1570,9 +1574,214 @@ const sendSerial = async () => {
   height: 100vh;
   width: 100vw;
   background-color: transparent;
-  color: #fff;
+  color: var(--text-main);
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
+}
+
+/* --- JuanRobotix OLED surface overrides --- */
+.panel,
+.global-port-section,
+.bottom-panel,
+.admin-panel-section {
+  background: var(--bg-panel);
+  border-color: var(--border-color);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.panel-header,
+.panel-tabs,
+.serial-input-bar {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+}
+
+.text-input,
+.custom-select,
+.text-input-with-icon,
+.input-wrapper-login input,
+.mini-select {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+.text-input:focus,
+.custom-select:focus,
+.text-input-with-icon:focus,
+.input-wrapper-login input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.14);
+  background: var(--bg-input);
+}
+
+.btn-primary,
+.btn-login-submit {
+  background: var(--primary-color);
+  color: #001018;
+  box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-login-submit:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-primary:active:not(:disabled),
+.btn-login-submit:active:not(:disabled) {
+  background: var(--primary-color);
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.btn-secondary,
+.btn-outline {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--text-muted);
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-outline:hover:not(:disabled) {
+  background: var(--bg-surface);
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+}
+
+.btn-danger,
+.btn-warning {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.btn-danger:hover:not(:disabled),
+.btn-warning:hover:not(:disabled) {
+  background: var(--bg-input);
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.tab-btn {
+  color: var(--text-muted);
+}
+
+.tab-btn:hover,
+.tab-btn.active {
+  color: var(--primary-hover);
+}
+
+.tab-btn.active {
+  border-bottom-color: var(--primary-color);
+}
+
+.terminal-body,
+.serial-body,
+.serial-output {
+  background: #000000;
+}
+
+.terminal-body,
+.log-line {
+  color: var(--text-main);
+}
+
+.serial-output {
+  color: var(--text-muted);
+}
+
+.status-icon-large,
+.success-text,
+.status-text .label,
+.mini-select-group .label,
+.admin-sub-header,
+.prompt-char {
+  color: var(--primary-color);
+}
+
+.status-sub,
+.checkbox-label,
+.input-label,
+.header-titles .section-subtitle,
+.text-muted,
+.cloud-status-msg {
+  color: var(--text-muted);
+}
+
+.status-tag.tag-active,
+.btn-mini-success,
+.btn-renew {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+  color: var(--primary-color);
+}
+
+.btn-mini-success:hover,
+.btn-renew:hover {
+  background: var(--bg-input);
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+}
+
+.login-glow {
+  display: none;
+}
+
+.login-card {
+  background: var(--bg-panel);
+  border-color: var(--border-color);
+  border-radius: 8px;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.glow-logo,
+.login-logo-img {
+  filter: none;
+}
+
+.login-logo h1 {
+  background: none;
+  color: var(--text-main);
+  -webkit-text-fill-color: currentColor;
+}
+
+.login-logo .subtitle,
+.input-group-login label,
+.login-footer {
+  color: var(--text-muted);
+}
+
+.login-error-msg {
+  background: rgba(226, 85, 85, 0.08);
+  border-color: rgba(226, 85, 85, 0.35);
+  color: var(--danger-hover);
+}
+
+.user-badge {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #000000;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
 }
 
 .main-grid {
@@ -1596,12 +1805,10 @@ const sendSerial = async () => {
 
 /* --- Global Port Bar --- */
 .global-port-section {
-  background: rgba(30, 30, 35, 0.4);
-  backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-color);
   padding: 20px 16px;
-  border-bottom: 4px solid var(--warning-color);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-strong);
   z-index: 10;
 }
 
@@ -1636,8 +1843,8 @@ const sendSerial = async () => {
   position: relative;
   display: flex;
   align-items: center;
-  background-color: rgba(10, 10, 12, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
 }
 
@@ -1651,8 +1858,8 @@ const sendSerial = async () => {
   padding-left: 12px;
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   min-width: 120px;
-  background: rgba(255, 255, 255, 0.01);
-  border-radius: 6px;
+  background: var(--bg-surface);
+  border-radius: 4px;
 }
 
 .status-dot {
@@ -1664,9 +1871,9 @@ const sendSerial = async () => {
 }
 
 .status-dot.active {
-  background-color: var(--success-color);
-  box-shadow: 0 0 8px rgba(76, 175, 80, 0.6);
-  animation: pulse 2s infinite;
+  background-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.16);
+  animation: none;
 }
 
 @keyframes pulse {
@@ -1681,8 +1888,8 @@ const sendSerial = async () => {
 
 .status-dot.disconnected {
   background-color: var(--danger-color);
-  box-shadow: 0 0 8px rgba(244, 67, 54, 0.6);
-  animation: pulse-warning 2s infinite;
+  box-shadow: 0 0 0 2px rgba(226, 85, 85, 0.16);
+  animation: none;
 }
 
 @keyframes pulse-warning {
@@ -2792,8 +2999,209 @@ const sendSerial = async () => {
   align-items: center;
 }
 
-.btn-small {
+  .btn-small {
   padding: 4px 10px;
   font-size: 0.7rem;
+}
+
+/* --- Final JuanRobotix OLED treatment --- */
+.app-wrapper,
+.login-view,
+.app-container {
+  background: var(--bg-dark);
+}
+
+.panel,
+.global-port-section,
+.bottom-panel,
+.admin-panel-section,
+.login-card {
+  background: var(--bg-panel);
+  border-color: var(--border-color);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.panel-header,
+.panel-tabs,
+.serial-input-bar,
+.active-port-indicator {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+}
+
+.text-input,
+.custom-select,
+.text-input-with-icon,
+.input-wrapper-login input,
+.mini-select {
+  background: var(--bg-input);
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+.text-input:focus,
+.custom-select:focus,
+.text-input-with-icon:focus,
+.input-wrapper-login input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.14);
+}
+
+.btn-primary,
+.btn-login-submit {
+  background: var(--primary-color);
+  color: #001018;
+  box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled),
+.btn-login-submit:hover:not(:disabled) {
+  background: var(--primary-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.btn-primary:active:not(:disabled),
+.btn-login-submit:active:not(:disabled) {
+  background: var(--primary-color);
+  box-shadow: none;
+  transform: translateY(1px);
+}
+
+.btn-secondary,
+.btn-outline,
+.btn-danger,
+.btn-warning {
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  color: var(--text-muted);
+  box-shadow: none;
+}
+
+.btn-secondary:hover:not(:disabled),
+.btn-outline:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
+.btn-warning:hover:not(:disabled) {
+  background: var(--bg-surface);
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+  box-shadow: none;
+  transform: none;
+}
+
+.tab-btn {
+  color: var(--text-muted);
+}
+
+.tab-btn:hover,
+.tab-btn.active,
+.source-btn.active {
+  color: var(--primary-hover);
+}
+
+.tab-btn.active,
+.source-btn.active {
+  border-bottom-color: var(--primary-color);
+  box-shadow: inset 0 -2px 0 var(--primary-color);
+}
+
+.terminal-body,
+.serial-body,
+.serial-output {
+  background: var(--bg-dark);
+}
+
+.terminal-body,
+.log-line {
+  color: var(--text-main);
+}
+
+.serial-output {
+  color: var(--text-muted);
+}
+
+.status-icon-large,
+.success-text,
+.status-text .label,
+.mini-select-group .label,
+.admin-sub-header,
+.prompt-char {
+  color: var(--primary-color);
+}
+
+.status-sub,
+.checkbox-label,
+.input-label,
+.header-titles .section-subtitle,
+.text-muted,
+.cloud-status-msg {
+  color: var(--text-muted);
+}
+
+.status-dot.active {
+  background-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(0, 168, 232, 0.16);
+  animation: none;
+}
+
+.login-glow {
+  display: none;
+}
+
+.login-card {
+  border-radius: 8px;
+}
+
+.glow-logo,
+.login-logo-img {
+  filter: none;
+}
+
+.login-logo h1 {
+  background: none;
+  color: var(--text-main);
+  -webkit-text-fill-color: currentColor;
+}
+
+.login-logo .subtitle,
+.input-group-login label,
+.login-footer {
+  color: var(--text-muted);
+}
+
+.user-badge {
+  background: var(--bg-surface);
+  border-color: var(--border-color);
+  color: var(--text-muted);
+  border-radius: 4px;
+}
+
+.status-tag.tag-active,
+.btn-mini-success,
+.btn-renew {
+  background: var(--bg-surface);
+  border-color: var(--border-strong);
+  color: var(--primary-color);
+}
+
+.btn-mini-success:hover,
+.btn-renew:hover {
+  background: var(--bg-input);
+  border-color: var(--primary-color);
+  color: var(--primary-hover);
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-color);
 }
 </style>
